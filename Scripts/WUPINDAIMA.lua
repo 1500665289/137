@@ -69,15 +69,15 @@ local function AddCostItem(ItemName,CostItemName,CostItemCount)
 end
 
 function JYS:OnBeforeInit()
-	AddCostItem("Item_HardWood","Item_LingStone", 100);--金丝木
-	AddCostItem("Item_LingWood","Item_LingStone", 300);--灵木
-	AddCostItem("Item_ParasolWood","Item_LingStone", 500);--梧桐木
-	AddCostItem("Item_IronRock","Item_LingStone", 10);--铁矿
-	AddCostItem("Item_CopperRock","Item_LingStone", 100);--火铜矿石
-	AddCostItem("Item_SilverRock","Item_LingStone", 100);--寒晶矿石
+	AddCostItem("Item_HardWood","Item_LingStone", 1500);--金丝木
+	AddCostItem("Item_LingWood","Item_LingStone", 3000);--灵木
+	AddCostItem("Item_ParasolWood","Item_LingStone", 5000);--梧桐木
+	AddCostItem("Item_IronRock","Item_LingStone", 100);--铁矿
+	AddCostItem("Item_CopperRock","Item_LingStone", 200);--火铜矿石
+	AddCostItem("Item_SilverRock","Item_LingStone", 200);--寒晶矿石
 	AddCostItem("Item_DarksteelRock","Item_LingStone", 500);--玄铁
 	AddCostItem("Item_StarEssence","Item_LingStone", 1000);--星髓
-	AddCostItem("Item_BrownRock","Item_LingStone", 10);--棕石
+	AddCostItem("Item_BrownRock","Item_LingStone", 100);--棕石
 	AddCostItem("Item_Marble","Item_LingStone", 250);--大理石
 	AddCostItem("Item_Jade","Item_LingStone", 500);--玉石
 	AddCostItem("Item_SkyStone","Item_LingStone", 5000);--天柱石

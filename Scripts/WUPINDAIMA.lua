@@ -4,6 +4,11 @@ local JYS = GameMain:GetMod("JYS")
 local originalPrices = {}  -- 存储原始价格 {itemName = {costItemName = baseCount}}
 local currentPrices = {}   -- 存储当前浮动价格 {itemName = {costItemName = currentCount}}
 
+-- 价格刷新计时器
+local refreshTimer = 0
+local REFRESH_INTERVAL = 60  -- 60秒刷新一次
+local isTimerRunning = false
+
 -- 初始化时设置原始基础价格
 function JYS:OnBeforeInit()
     -- 清空价格记录
@@ -59,6 +64,11 @@ function JYS:OnBeforeInit()
     
     -- 为每个物品初始生成随机价格
     InitializeRandomPrices()
+    
+    -- 初始化定时器
+    refreshTimer = 0
+    isTimerRunning = true
+    print(string.format("JYS mod: 定时刷新已启动，每%d秒刷新一次价格", REFRESH_INTERVAL))
 end
 
 function SetBasePrice(itemName, costItemName, baseCount)
@@ -181,6 +191,16 @@ local purchaseCounts = {}
 -- 记录价格刷新时间
 local lastPriceRefresh = {}
 
+-- 刷新所有物品价格
+function RefreshAllPrices()
+    local count = 0
+    for itemName, _ in pairs(originalPrices) do
+        RandomizeItemPrice(itemName)
+        count = count + 1
+    end
+    return count
+end
+
 -- 监听购买事件
 function JYS:OnInit()
     -- 监听工作完成事件
@@ -238,12 +258,42 @@ function JYS:OnInit()
     print("JYS mod 已加载，独立价格浮动系统已启用")
 end
 
+-- 更新函数，每帧调用
+function JYS:Update(deltaTime)
+    if not isTimerRunning then
+        return
+    end
+    
+    -- 更新定时器
+    refreshTimer = refreshTimer + deltaTime
+    
+    -- 检查是否需要刷新价格
+    if refreshTimer >= REFRESH_INTERVAL then
+        refreshTimer = 0
+        RefreshPricesOnTimer()
+    end
+end
+
+-- 定时刷新所有价格
+function RefreshPricesOnTimer()
+    local count = RefreshAllPrices()
+    
+    -- 在聊天框显示消息
+    if CS.XiaWorld.MainPlayer then
+        CS.XiaWorld.MainPlayer:AddImportantMsg(
+            string.format("[灵石交换处] 商品价格已定时刷新！已更新%d个商品的价格。", count))
+    end
+    
+    print(string.format("JYS: 定时价格刷新完成，已更新%d个商品的价格", count))
+end
+
 -- 保存/加载时保存当前价格状态
 function JYS:OnSave()
     local saveData = {
         originalPrices = originalPrices,
         currentPrices = currentPrices,
-        purchaseCounts = purchaseCounts
+        purchaseCounts = purchaseCounts,
+        refreshTimer = refreshTimer
     }
     return CS.SysMgr.save:SaveData("JYS_PriceData", saveData)
 end
@@ -254,6 +304,7 @@ function JYS:OnLoad()
         originalPrices = loadedData.originalPrices
         currentPrices = loadedData.currentPrices
         purchaseCounts = loadedData.purchaseCounts or {}
+        refreshTimer = loadedData.refreshTimer or 0
         
         -- 应用加载的价格
         for itemName, costData in pairs(currentPrices) do
@@ -262,10 +313,16 @@ function JYS:OnLoad()
             end
         end
         
-        print("JYS mod: 已加载保存的价格数据")
+        -- 启动定时器
+        isTimerRunning = true
+        
+        print(string.format("JYS mod: 已加载保存的价格数据，定时器: %.1f秒", refreshTimer))
     else
         -- 如果没有保存的数据，重新生成价格
         InitializeRandomPrices()
+        -- 启动定时器
+        isTimerRunning = true
+        refreshTimer = 0
     end
 end
 
@@ -273,13 +330,13 @@ end
 function JYS:OnCommand(cmd)
     if cmd == "/jys_refresh_all" then
         -- 重新生成所有物品的价格
-        for itemName, _ in pairs(originalPrices) do
-            RandomizeItemPrice(itemName)
-        end
+        local count = RefreshAllPrices()
         
         if CS.XiaWorld.MainPlayer then
-            CS.XiaWorld.MainPlayer:AddImportantMsg("[灵石交换处] 已手动刷新所有商品价格！")
+            CS.XiaWorld.MainPlayer:AddImportantMsg(
+                string.format("[灵石交换处] 已手动刷新所有商品价格！更新了%d个商品。", count))
         end
+        print(string.format("JYS: 手动刷新完成，更新了%d个商品价格", count))
         
     elseif cmd:find("^/jys_refresh ") then
         -- 刷新指定物品价格，例如: /jys_refresh Item_HardWood
@@ -334,6 +391,51 @@ function JYS:OnCommand(cmd)
         purchaseCounts = {}
         if CS.XiaWorld.MainPlayer then
             CS.XiaWorld.MainPlayer:AddImportantMsg("[灵石交换处] 已重置所有物品的购买次数！")
+        end
+        
+    elseif cmd == "/jys_timer_on" then
+        -- 启动定时器
+        isTimerRunning = true
+        refreshTimer = 0
+        if CS.XiaWorld.MainPlayer then
+            CS.XiaWorld.MainPlayer:AddImportantMsg("[灵石交换处] 已启用定时价格刷新！")
+        end
+        print("JYS: 定时器已启用")
+        
+    elseif cmd == "/jys_timer_off" then
+        -- 停止定时器
+        isTimerRunning = false
+        if CS.XiaWorld.MainPlayer then
+            CS.XiaWorld.MainPlayer:AddImportantMsg("[灵石交换处] 已禁用定时价格刷新！")
+        end
+        print("JYS: 定时器已禁用")
+        
+    elseif cmd == "/jys_timer_status" then
+        -- 显示定时器状态
+        local status = isTimerRunning and "运行中" or "已停止"
+        local remaining = REFRESH_INTERVAL - refreshTimer
+        if remaining < 0 then remaining = 0 end
+        
+        local msg = string.format("定时器状态: %s\n刷新间隔: %d秒\n下次刷新: %.1f秒后", 
+            status, REFRESH_INTERVAL, remaining)
+        
+        if CS.XiaWorld.MainPlayer then
+            CS.XiaWorld.MainPlayer:AddImportantMsg("[灵石交换处] " .. msg)
+        end
+        print("JYS: " .. msg)
+        
+    elseif cmd:find("^/jys_set_interval ") then
+        -- 设置刷新间隔，例如: /jys_set_interval 120
+        local interval = cmd:match("/jys_set_interval (.+)")
+        interval = tonumber(interval)
+        if interval and interval > 0 then
+            REFRESH_INTERVAL = interval
+            refreshTimer = 0
+            if CS.XiaWorld.MainPlayer then
+                CS.XiaWorld.MainPlayer:AddImportantMsg(
+                    string.format("[灵石交换处] 已将价格刷新间隔设置为 %d 秒！", REFRESH_INTERVAL))
+            end
+            print(string.format("JYS: 刷新间隔已设置为 %d 秒", REFRESH_INTERVAL))
         end
     end
 end
